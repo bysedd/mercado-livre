@@ -55,6 +55,7 @@ def read_main_offer() -> None:
     """
     Reads the main offer from a JSON file and prints it with indentation.
     """
+    print("Reading")
     print(json.dumps(bt.read_json(file_name)[0], indent=4, ensure_ascii=False))
 
 
