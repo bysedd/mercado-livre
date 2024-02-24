@@ -1,7 +1,8 @@
 import json
 from datetime import datetime
 
-from botasaurus import *
+import requests
+from bs4 import BeautifulSoup
 from bson import json_util
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
@@ -10,7 +11,7 @@ import logging
 
 from scripts.const import SELECTORS
 
-logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(message)s")
+logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(message)s", datefmt="%d-%m-%Y %H:%M:%S")
 
 
 def get_client() -> MongoClient:
@@ -29,11 +30,12 @@ class Task:
     collection_name = "offers_collection"
 
     def __init__(self) -> None:
-        self.__request = bt.create_requests()
         self.__client = get_client()
 
     def scrape_main_offer(self) -> None:
-        soup = self.__request.bs4("https://www.mercadolivre.com.br/")
+        soup = BeautifulSoup(
+            requests.get("https://www.mercadolivre.com.br/").text, "html.parser"
+        )
         data: dict[str, str] = {}
 
         for key, selector in SELECTORS.items():
