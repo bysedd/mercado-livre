@@ -42,5 +42,5 @@ def scrape_main_offer_task(request: AntiDetectRequests, data: list[str]):
                 sleep(time_interval)  # Delay for a specific time interval
             else:
                 data[key] = "Attribute not found"  # Or any default value
-    
+
     write_file(data=data, file_path=output_dir / file_name)
