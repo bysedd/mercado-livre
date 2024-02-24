@@ -1,6 +1,9 @@
 import json
+import os
 from datetime import datetime
 from pathlib import Path
+
+from botasaurus import bt
 
 
 def write_file(*, data: dict, file_path: str | Path) -> None:
@@ -34,3 +37,12 @@ def write_file(*, data: dict, file_path: str | Path) -> None:
 
     with open(file_path, "w") as file:
         json.dump(content, file, indent=4)
+
+
+def read_main_offer() -> None:
+    """
+    Reads the main offer from a JSON file and prints it with indentation.
+    """
+    print("Reading last offer")
+    file_name = os.getenv("FILENAME")
+    print(json.dumps(bt.read_json(file_name)[-1], indent=4, ensure_ascii=False))
