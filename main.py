@@ -1,4 +1,4 @@
-from tasks.scrape_offer import Task
+from scripts.scrape_offer import Task
 
 if __name__ == "__main__":
     task = Task()
