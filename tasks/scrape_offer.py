@@ -1,13 +1,16 @@
 import json
 from datetime import datetime
-from time import sleep
 
 from botasaurus import *
 from bson import json_util
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 
+import logging
+
 from scripts.const import SELECTORS
+
+logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(message)s")
 
 
 def get_client() -> MongoClient:
@@ -31,28 +34,18 @@ class Task:
 
     def scrape_main_offer(self) -> None:
         soup = self.__request.bs4("https://www.mercadolivre.com.br/")
+        data: dict[str, str] = {}
 
-        data = {}
-        max_attempts = 10
-        time_interval = 1
-
-        for key in SELECTORS:
-            for i in range(max_attempts):
-                element = soup.select_one(SELECTORS[key])
-                if element and element.text:
-                    data[key] = element.text.strip()
-                    break
-                elif i != (max_attempts - 1):
-                    sleep(time_interval)
-                else:
-                    data[key] = "Attribute not found"
+        for key, selector in SELECTORS.items():
+            element = soup.select_one(selector)
+            if element and element.text:
+                data[key] = element.text.strip()
+            else:
+                data[key] = "Attribute not found"
 
         self.__write(data=data)
 
     def __write(self, data: dict) -> None:
-        print("Writing")
-        print("\t" + self.collection_name)
-
         client = self.__client
         db = client["mercado_livre"]
         collection = db[self.collection_name]
@@ -64,6 +57,9 @@ class Task:
 
         if collection.find_one({"main_offer": new_offer["main_offer"]}) is None:
             collection.insert_one(new_offer)
+            logging.info("New offer inserted")
+        else:
+            logging.info("Offer already exists")
 
     def read(self) -> None:
         print("Reading last offer")
