@@ -1,46 +1,82 @@
-import os
-from pathlib import Path
+import json
+from datetime import datetime
 from time import sleep
 
 from botasaurus import *
-from dotenv import load_dotenv
+from bson import json_util
+from pymongo.mongo_client import MongoClient
+from pymongo.server_api import ServerApi
 
 from scripts.const import SELECTORS
-from scripts.utils import write_file
-
-load_dotenv()
-
-file_name = Path(os.getenv("FILENAME"))
-output_dir = Path("output")
 
 
-@request(
-    output=None,
-    data=["https://www.mercadolivre.com.br/"],
-)
-def scrape_main_offer_task(request: AntiDetectRequests, data: list[str]):
-    """
-    Scrape the main offer from a webpage and return the result as a dictionary.
+def get_client() -> MongoClient:
+    uri = (
+        "mongodb+srv://4drade:ws4vQVUziI3fvBan@cluster0.dwjmome.mongodb.net/?retryWrites=true&w=majority&appName"
+        "=Cluster0"
+    )
+    client = MongoClient(uri, server_api=ServerApi("1"))
+    try:
+        return client
+    except Exception as e:
+        print(e)
 
-    :param request: Instance of AntiDetectRequests.
-    :param data: List of URLs to scrape.
-    :return: Dictionary with the main offers details.
-    """
-    soup = request.bs4(data)
 
-    data = {}
-    max_attempts = 10
-    time_interval = 2  # seconds
+class Task:
+    collection_name = "offers_collection"
 
-    for key in SELECTORS:
-        for i in range(max_attempts):
-            element = soup.select_one(SELECTORS[key])
-            if element and element.text:
-                data[key] = element.text.strip()
-                break
-            elif i != (max_attempts - 1):  # Do not sleep after the last attempt
-                sleep(time_interval)  # Delay for a specific time interval
-            else:
-                data[key] = "Attribute not found"  # Or any default value
+    def __init__(self) -> None:
+        self.__request = bt.create_requests()
+        self.__client = get_client()
 
-    write_file(data=data, file_path=output_dir / file_name)
+    def scrape_main_offer(self) -> None:
+        soup = self.__request.bs4("https://www.mercadolivre.com.br/")
+
+        data = {}
+        max_attempts = 10
+        time_interval = 1
+
+        for key in SELECTORS:
+            for i in range(max_attempts):
+                element = soup.select_one(SELECTORS[key])
+                if element and element.text:
+                    data[key] = element.text.strip()
+                    break
+                elif i != (max_attempts - 1):
+                    sleep(time_interval)
+                else:
+                    data[key] = "Attribute not found"
+
+        self.__write(data=data)
+
+    def __write(self, data: dict) -> None:
+        print("Writing")
+        print("\t" + self.collection_name)
+
+        client = self.__client
+        db = client["mercado_livre"]
+        collection = db[self.collection_name]
+
+        new_offer = {
+            "datetime": datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
+            "main_offer": data,
+        }
+
+        if collection.find_one({"main_offer": new_offer["main_offer"]}) is None:
+            collection.insert_one(new_offer)
+
+    def read(self) -> None:
+        print("Reading last offer")
+
+        client = self.__client
+        db = client["mercado_livre"]
+        collection = db[self.collection_name]
+        # Get the last offer from the collection
+        last_offer = collection.find().sort([("datetime", -1)]).limit(1)[0]
+
+        # Print the last offer
+        print(
+            json.dumps(
+                last_offer, default=json_util.default, indent=4, ensure_ascii=False
+            )
+        )
