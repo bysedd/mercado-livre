@@ -8,17 +8,17 @@ from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 
 import logging
+import os
 
 from scripts.const import SELECTORS
 
-logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(message)s", datefmt="%d-%m-%Y %H:%M:%S")
+logging.basicConfig(
+    level=logging.INFO, format="[%(asctime)s] %(message)s", datefmt="%d-%m-%Y %H:%M:%S"
+)
 
 
 def get_client() -> MongoClient:
-    uri = (
-        "mongodb+srv://4drade:ws4vQVUziI3fvBan@cluster0.dwjmome.mongodb.net/?retryWrites=true&w=majority&appName"
-        "=Cluster0"
-    )
+    uri = os.environ['URI']
     client = MongoClient(uri, server_api=ServerApi("1"))
     try:
         return client
