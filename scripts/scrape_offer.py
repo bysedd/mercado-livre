@@ -42,10 +42,11 @@ class Task:
             element = soup.select_one(selector)
             if element and element.text:
                 data[key] = element.text.strip()
-            else:
-                data[key] = "Attribute not found"
 
-        self.__write(data=data)
+        if len(data) == 6:
+            self.__write(data=data)
+        else:
+            logging.error("Error scraping main offer")
 
     def __write(self, data: dict) -> None:
         client = self.__client
