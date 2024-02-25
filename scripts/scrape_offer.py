@@ -40,10 +40,9 @@ class Task:
 
         for key, selector in SELECTORS.items():
             element = soup.select_one(selector)
-            if element and element.text:
-                data[key] = element.text.strip()
+            data[key] = element.text.strip()
 
-        if len(data) == 6:
+        if len(data.keys()) == 6:
             self.__write(data=data)
         else:
             logging.error("Error scraping main offer")
