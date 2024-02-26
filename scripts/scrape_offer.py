@@ -58,8 +58,9 @@ class Task:
             except AttributeError:
                 logging.error(f"Error scraping {key}")
                 break
-            else:
-                self.__write(data=data)
+
+        if len(data.keys()) == 6:
+            self.__write(data=data)
 
     def __write(self, data: dict) -> None:
         client = self.__client
