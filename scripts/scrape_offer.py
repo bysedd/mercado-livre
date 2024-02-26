@@ -10,15 +10,13 @@ from pymongo.server_api import ServerApi
 import logging
 import os
 
-from scripts.const import SELECTORS
-
 logging.basicConfig(
     level=logging.INFO, format="[%(asctime)s] %(message)s", datefmt="%d-%m-%Y %H:%M:%S"
 )
 
 
 def get_client() -> MongoClient:
-    uri = os.environ['URI']
+    uri = os.environ["URI"]
     client = MongoClient(uri, server_api=ServerApi("1"))
     try:
         return client
@@ -28,8 +26,23 @@ def get_client() -> MongoClient:
 
 class Task:
     collection_name = "offers_collection"
+    SELECTORS = dict(
+        offer_title=r"#\:Raidq\: > div.andes-carousel-snapped__controls-wrapper > div > div > div > div > "
+        "div.poly-card__content > a",
+        original_price=r"#\:Raidq\: > div.andes-carousel-snapped__controls-wrapper > div > div > div > div > "
+        "div.poly-card__content > div.poly-component__price > s",
+        current_price=r"#\:Raidq\: > div.andes-carousel-snapped__controls-wrapper > div > div > div > div > "
+        "div.poly-card__content > div.poly-component__price > div > "
+        "span.andes-money-amount.andes-money-amount--cents-superscript",
+        amount_discount=r"#\:Raidq\: > div.andes-carousel-snapped__controls-wrapper > div > div > div > div > "
+        "div.poly-card__content > div.poly-component__price > div > span.andes-money-amount__discount",
+        installments=r"#\:Raidq\: > div.andes-carousel-snapped__controls-wrapper > div > div > div > div > "
+        "div.poly-card__content > div.poly-component__price > span",
+        shipping=r"#\:Raidq\: > div.andes-carousel-snapped__controls-wrapper > div > div > div > div > "
+        "div.poly-card__content > div.poly-component__shipping",
+    )
 
-    def __init__(self) -> None:
+    def __init__(self):
         self.__client = get_client()
 
     def scrape_main_offer(self) -> None:
@@ -38,14 +51,15 @@ class Task:
         )
         data: dict[str, str] = {}
 
-        for key, selector in SELECTORS.items():
+        for key, selector in self.SELECTORS.items():
             element = soup.select_one(selector)
-            data[key] = element.text.strip()
-
-        if len(data.keys()) == 6:
-            self.__write(data=data)
-        else:
-            logging.error("Error scraping main offer")
+            try:
+                data[key] = element.text.strip()
+            except AttributeError:
+                logging.error(f"Error scraping {key}")
+                break
+            else:
+                self.__write(data=data)
 
     def __write(self, data: dict) -> None:
         client = self.__client
