@@ -4,6 +4,8 @@ import os
 from abc import ABC, abstractmethod
 from datetime import datetime
 
+import requests
+from bs4 import BeautifulSoup
 from bson import json_util
 from dotenv import load_dotenv
 from pymongo.mongo_client import MongoClient
@@ -20,9 +22,27 @@ class BaseTask(ABC):
         load_dotenv()
         self.__client = self.get_client(use_local_uri)
 
-    @abstractmethod
+    def scrape_data(self, soup_selector: str) -> dict:
+        soup = BeautifulSoup(
+            requests.get("https://www.mercadolivre.com.br/").text, "html.parser"
+        )
+        data = {}
+        offer_card = soup.select(soup_selector)
+
+        for card in offer_card:
+            for key, selector in self.selectors.items():
+                element = card.select_one(selector)
+                try:
+                    if key == "picture":
+                        data[key] = element["data-src"]
+                    else:
+                        data[key] = element.text.strip()
+                except AttributeError:
+                    data[key] = None
+        return data
+
     def run(self) -> None:
-        pass
+        self.write(self.scrape_data(self.get_soup_selector()))
 
     @staticmethod
     def get_client(use_local_uri: bool = False) -> MongoClient:
@@ -42,20 +62,19 @@ class BaseTask(ABC):
 
         :param data: A dictionary containing the data to be inserted.
         """
-        if len(data.keys()) == 6:
-            client = self.__client
-            db = client["mercado_livre"]
-            collection = db[self.collection_name]
-            new_offer = {
-                "date_added": datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
-                "offer": data,
-            }
+        client = self.__client
+        db = client["mercado_livre"]
+        collection = db[self.collection_name]
+        new_offer = {
+            "date": datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
+            "offer": data,
+        }
 
-            if collection.find_one({"offer": new_offer["offer"]}) is None:
-                collection.insert_one(new_offer)
-                logging.info("New offer inserted")
-            else:
-                logging.info("Offer already exists")
+        if collection.find_one({"offer": new_offer["offer"]}) is None:
+            collection.insert_one(new_offer)
+            logging.info("New offer inserted")
+        else:
+            logging.info("Offer already exists")
 
     def read(self) -> None:
         """
@@ -88,7 +107,18 @@ class BaseTask(ABC):
     def collection_name(self) -> str:
         pass
 
-    @property
     @abstractmethod
-    def selectors(self) -> dict[str, str]:
+    def get_soup_selector(self) -> str:
         pass
+
+    @property
+    def selectors(self) -> dict[str, str]:
+        return dict(
+            picture="img.poly-component__picture.poly-component__picture--square",
+            title="a.poly-component__title",
+            previous_price="s.andes-money-amount.andes-money-amount--previous.andes-money-amount--cents-comma",
+            current_price="pan.andes-money-amount.andes-money-amount--cents-superscript",
+            amount_discount="span.andes-money-amount__discount",
+            installments="span.poly-price__installments.poly-text-positive",
+            shipping="div.poly-component__shipping",
+        )
