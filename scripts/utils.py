@@ -6,6 +6,7 @@ from datetime import datetime
 
 import requests
 from bs4 import BeautifulSoup
+import bs4
 from bson import json_util
 from dotenv import load_dotenv
 from pymongo.mongo_client import MongoClient
@@ -13,6 +14,11 @@ from pymongo.server_api import ServerApi
 
 
 class BaseTask(ABC):
+    """
+    Abstract base class that provides a basic structure for tasks related to scraping data
+    from the Mercado Livre website and storing it in a MongoDB database
+    """
+
     def __init__(self, use_local_uri: bool = False):
         logging.basicConfig(
             level=logging.INFO,
@@ -20,32 +26,50 @@ class BaseTask(ABC):
             datefmt="%d-%m-%Y %H:%M:%S",
         )
         load_dotenv()
-        self.__client = self.get_client(use_local_uri)
+        self.__client = self.__get_client(use_local_uri)
 
-    def scrape_data(self, soup_selector: str) -> dict:
+    @staticmethod
+    def __extract_data(element, key, selector) -> str | None:
+        try:
+            if key == "picture":
+                return element["data-src"]
+            else:
+                return element.text.strip()
+        except AttributeError:
+            return None
+
+    def __scrape_data(self) -> dict:
+        """
+        Scrapes data from the Mercado Livre website using the provided soup_selector.
+
+        :return: A dictionary containing the scraped data.
+        """
         soup = BeautifulSoup(
             requests.get("https://www.mercadolivre.com.br/").text, "html.parser"
         )
-        data = {}
-        offer_card = soup.select(soup_selector)
+        offer_card = self.get_soup_selector(soup)
 
-        for card in offer_card:
-            for key, selector in self.selectors.items():
-                element = card.select_one(selector)
-                try:
-                    if key == "picture":
-                        data[key] = element["data-src"]
-                    else:
-                        data[key] = element.text.strip()
-                except AttributeError:
-                    data[key] = None
-        return data
+        match type(offer_card):
+            case bs4.element.Tag:
+                data = {}
+                for key, selector in self.selectors.items():
+                    element = offer_card.select_one(selector)
+                    data[key] = self.__extract_data(element, key, selector)
+                yield data
+            case bs4.element.ResultSet:
+                for card in offer_card:
+                    data = {}
+                    for key, selector in self.selectors.items():
+                        element = card.select_one(selector)
+                        data[key] = self.__extract_data(element, key, selector)
+                    yield data
 
     def run(self) -> None:
-        self.write(self.scrape_data(self.get_soup_selector()))
+        for data in self.__scrape_data():
+            self.__write(data)
 
     @staticmethod
-    def get_client(use_local_uri: bool = False) -> MongoClient:
+    def __get_client(use_local_uri: bool = False) -> MongoClient:
         """
         Get a MongoClient object for connecting to a MongoDB database.
 
@@ -56,7 +80,7 @@ class BaseTask(ABC):
         client = MongoClient(uri, server_api=ServerApi("1"))
         return client
 
-    def write(self, data: dict) -> None:
+    def __write(self, data: dict) -> None:
         """
         Write method for inserting data into the database.
 
@@ -108,7 +132,7 @@ class BaseTask(ABC):
         pass
 
     @abstractmethod
-    def get_soup_selector(self) -> str:
+    def get_soup_selector(self, soup: BeautifulSoup) -> bs4.element.Tag | bs4.element.ResultSet:
         pass
 
     @property
@@ -117,7 +141,7 @@ class BaseTask(ABC):
             picture="img.poly-component__picture.poly-component__picture--square",
             title="a.poly-component__title",
             previous_price="s.andes-money-amount.andes-money-amount--previous.andes-money-amount--cents-comma",
-            current_price="pan.andes-money-amount.andes-money-amount--cents-superscript",
+            current_price="span.andes-money-amount.andes-money-amount--cents-superscript",
             amount_discount="span.andes-money-amount__discount",
             installments="span.poly-price__installments.poly-text-positive",
             shipping="div.poly-component__shipping",

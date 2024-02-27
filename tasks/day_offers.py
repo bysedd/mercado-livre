@@ -1,16 +1,14 @@
+from bs4.element import ResultSet
+
 from scripts.utils import BaseTask
 
 
 class Task(BaseTask):
-    """
-    The Task class represents a task object for handling tasks related to a specific collection of other offers.
-    """
-
     def __init__(self, use_local_uri: bool = False):
         super().__init__(use_local_uri)
 
-    def get_soup_selector(self) -> str:
-        return "div.poly-card poly-card--grid"
+    def get_soup_selector(self, soup) -> ResultSet:
+        return soup.find_all("div", class_="poly-card poly-card--grid")
 
     @property
     def collection_name(self) -> str:
