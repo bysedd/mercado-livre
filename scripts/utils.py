@@ -45,7 +45,7 @@ class BaseTask(ABC):
         :return: A dictionary containing the scraped data.
         """
         soup = BeautifulSoup(
-            requests.get("https://www.mercadolivre.com.br/").text, "html.parser"
+            requests.get(self.site_url).text, "html.parser"
         )
         offer_card = self.get_soup_selector(soup)
 
@@ -146,3 +146,7 @@ class BaseTask(ABC):
             installments="span.poly-price__installments.poly-text-positive",
             shipping="div.poly-component__shipping",
         )
+
+    @property
+    def site_url(self) -> str:
+        return "https://www.mercadolivre.com.br/"
