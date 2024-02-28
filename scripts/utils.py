@@ -4,9 +4,9 @@ import os
 from abc import ABC, abstractmethod
 from datetime import datetime
 
+import bs4
 import requests
 from bs4 import BeautifulSoup
-import bs4
 from bson import json_util
 from dotenv import load_dotenv
 from pymongo.mongo_client import MongoClient
@@ -27,6 +27,7 @@ class BaseTask(ABC):
         )
         load_dotenv()
         self.__client = self.__get_client(use_local_uri)
+        self.__collection = self.__client["mercado_livre"][self.collection_name]
 
     @staticmethod
     def __extract_data(element, key, selector) -> str | None:
@@ -44,9 +45,7 @@ class BaseTask(ABC):
 
         :return: A dictionary containing the scraped data.
         """
-        soup = BeautifulSoup(
-            requests.get(self.site_url).text, "html.parser"
-        )
+        soup = BeautifulSoup(requests.get(self.site_url).text, "html.parser")
         offer_card = self.get_soup_selector(soup)
 
         match type(offer_card):
@@ -86,30 +85,27 @@ class BaseTask(ABC):
 
         :param data: A dictionary containing the data to be inserted.
         """
-        client = self.__client
-        db = client["mercado_livre"]
-        collection = db[self.collection_name]
         new_offer = {
             "date": datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
-            "offer": data,
         }
+        new_offer.update(data)
 
-        if collection.find_one({"offer": new_offer["offer"]}) is None:
-            collection.insert_one(new_offer)
-            logging.info("New offer inserted")
+        find_offer = {k: v for k, v in new_offer.items() if k in self.selectors.keys()}
+        existing_offer = self.__collection.find_one(find_offer)
+
+        if existing_offer is None:
+            self.__collection.insert_one(new_offer)
+            logging.info("New offer inserted to collection.")
         else:
-            logging.info("Offer already exists")
+            logging.info("Offer already exists in collection.")
 
     def read(self) -> None:
         """
         Read a random offer from the collection.
         """
         print("Reading random offer")
-        client = self.__client
-        db = client["mercado_livre"]
-        collection = db[self.collection_name]
         # Get a random offer from the collection
-        random_offer = collection.aggregate([{"$sample": {"size": 1}}])
+        random_offer = self.__collection.aggregate([{"$sample": {"size": 1}}])
         # Extract the offer document
         random_offer_doc = next(random_offer, None)
 
@@ -132,7 +128,9 @@ class BaseTask(ABC):
         pass
 
     @abstractmethod
-    def get_soup_selector(self, soup: BeautifulSoup) -> bs4.element.Tag | bs4.element.ResultSet:
+    def get_soup_selector(
+        self, soup: BeautifulSoup
+    ) -> bs4.element.Tag | bs4.element.ResultSet:
         pass
 
     @property
