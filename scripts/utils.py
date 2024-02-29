@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 from abc import ABC, abstractmethod
 from datetime import datetime
 
@@ -39,29 +40,40 @@ class BaseTask(ABC):
         except AttributeError:
             return None
 
-    def __scrape_data(self) -> dict:
-        """
-        Scrapes data from the Mercado Livre website using the provided soup_selector.
+    @staticmethod
+    def __normalize_price(price: str) -> int:
+        if price:
+            regex = re.compile(r"[-+]?\d*\.?\d+")
+            match = regex.search(price)
+            if match:
+                return int(match.group(0).replace(".", "").replace(",", ""))
 
-        :return: A dictionary containing the scraped data.
+    def __scrape_data(self):
+        """
+        Scrapes data from a web page.
+
+        :return: A generator that yields dictionaries containing scraped data.
+        :rtype: generator
         """
         soup = BeautifulSoup(requests.get(self.site_url).text, "html.parser")
         offer_card = self.get_soup_selector(soup)
 
-        match type(offer_card):
-            case bs4.element.Tag:
-                data = {}
-                for key, selector in self.selectors.items():
-                    element = offer_card.select_one(selector)
-                    data[key] = self.__extract_data(element, key, selector)
-                yield data
-            case bs4.element.ResultSet:
-                for card in offer_card:
-                    data = {}
-                    for key, selector in self.selectors.items():
-                        element = card.select_one(selector)
-                        data[key] = self.__extract_data(element, key, selector)
-                    yield data
+        def scrape_single_card(card: bs4.element.ResultSet | bs4.element.Tag):
+            data = {}
+            numeric_keys = ["price", "price_current", "amount_discount"]
+            for key, selector in self.selectors.items():
+                element = card.select_one(selector)
+                element = self.__extract_data(element, key, selector)
+                data[key] = self.__normalize_price(element) if key in numeric_keys else element
+            return data
+
+        if isinstance(offer_card, bs4.element.Tag):
+            logging.info("Scraping main offers")
+            yield scrape_single_card(offer_card)
+        elif isinstance(offer_card, bs4.element.ResultSet):
+            logging.info("Scraping other offers")
+            for card in offer_card:
+                yield scrape_single_card(card)
 
     def run(self) -> None:
         for data in self.__scrape_data():
@@ -138,8 +150,8 @@ class BaseTask(ABC):
         return dict(
             picture="img.poly-component__picture.poly-component__picture--square",
             title="a.poly-component__title",
-            previous_price="s.andes-money-amount.andes-money-amount--previous.andes-money-amount--cents-comma",
-            current_price="span.andes-money-amount.andes-money-amount--cents-superscript",
+            price="s.andes-money-amount.andes-money-amount--previous.andes-money-amount--cents-comma",
+            price_current="span.andes-money-amount.andes-money-amount--cents-superscript",
             amount_discount="span.andes-money-amount__discount",
             installments="span.poly-price__installments.poly-text-positive",
             shipping="div.poly-component__shipping",
