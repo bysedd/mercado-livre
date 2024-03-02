@@ -32,6 +32,14 @@ class BaseTask(ABC):
 
     @staticmethod
     def __extract_data(element, key, selector) -> str | None:
+        """
+        Extracts data from an element based on the given key and selector.
+
+        :param element: The element to extract data from.
+        :param key: The key is used to determine how to extract the data.
+        :param selector: The selector is used to locate the data within the element.
+        :return: The extracted data as a string, or None if an error occurs.
+        """
         try:
             if key == "picture":
                 return element["data-src"]
@@ -42,18 +50,24 @@ class BaseTask(ABC):
 
     @staticmethod
     def __normalize_price(price: str) -> int:
-        if price:
+        """
+        Normalize the given price by removing any non-numeric characters and returning an integer.
+
+        :param price: The price to be normalized.
+        :return: The normalized price as an integer.
+        """
+        if price and isinstance(price, str):
             regex = re.compile(r"[-+]?\d*\.?\d+")
             match = regex.search(price)
             if match:
                 return int(match.group(0).replace(".", "").replace(",", ""))
+        raise ValueError("Price is not a string or is empty")
 
     def __scrape_data(self):
         """
-        Scrapes data from a web page.
+        Scrapes data using BeautifulSoup from the given site URL.
 
-        :return: A generator that yields dictionaries containing scraped data.
-        :rtype: generator
+        :return: A generator that yields scraped data as dictionaries.
         """
         soup = BeautifulSoup(requests.get(self.site_url).text, "html.parser")
         offer_card = self.get_soup_selector(soup)
@@ -76,6 +90,9 @@ class BaseTask(ABC):
                 yield scrape_single_card(card)
 
     def run(self) -> None:
+        """
+        Run the method to scrape data and write it.
+        """
         for data in self.__scrape_data():
             self.__write(data)
 
@@ -144,6 +161,12 @@ class BaseTask(ABC):
     def get_soup_selector(
         self, soup: BeautifulSoup
     ) -> bs4.element.Tag | bs4.element.ResultSet:
+        """
+        Get the selector for the given BeautifulSoup object.
+
+        :param soup: The BeautifulSoup object to get the selector for.
+        :return: The selector, which can be either a bs4.element.Tag or bs4.element.ResultSet object.
+        """
         pass
 
     @property
