@@ -102,7 +102,8 @@ class BaseTask(ABC):
         }
         new_offer.update(data)
 
-        find_offer = {k: v for k, v in new_offer.items() if k in self.selectors.keys()}
+        compare_selectors = ["title", "price", "price_current", "amount_discount"]
+        find_offer = {k: v for k, v in new_offer.items() if k in compare_selectors}
         existing_offer = self.__collection.find_one(find_offer)
 
         if existing_offer is None:
