@@ -48,21 +48,6 @@ class BaseTask(ABC):
         except AttributeError:
             return None
 
-    @staticmethod
-    def __normalize_price(price: str) -> int:
-        """
-        Normalize the given price by removing any non-numeric characters and returning an integer.
-
-        :param price: The price to be normalized.
-        :return: The normalized price as an integer.
-        """
-        if price and isinstance(price, str):
-            regex = re.compile(r"[-+]?\d*\.?\d+")
-            match = regex.search(price)
-            if match:
-                return int(match.group(0).replace(".", "").replace(",", ""))
-        raise ValueError("Price is not a string or is empty")
-
     def __scrape_data(self):
         """
         Scrapes data using BeautifulSoup from the given site URL.
@@ -78,7 +63,7 @@ class BaseTask(ABC):
             for key, selector in self.selectors.items():
                 element = card.select_one(selector)
                 element = self.__extract_data(element, key, selector)
-                data[key] = self.__normalize_price(element) if key in numeric_keys else element
+                data[key] = element
             return data
 
         if isinstance(offer_card, bs4.element.Tag):
