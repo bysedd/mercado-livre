@@ -25,7 +25,7 @@ def execute_all_tasks():
         ├── task1.py
         ├── task2.py
     """
-    for importer, modname, is_pkg in pkgutil.iter_modules(tasks.__path__):
+    for _, modname, is_pkg in pkgutil.iter_modules(tasks.__path__):
         if not is_pkg:
             try:
                 module = importlib.import_module("." + modname, "tasks")
@@ -34,8 +34,10 @@ def execute_all_tasks():
             except ImportError:
                 raise ImportError(f"Could not import module '{modname}'")
             except AttributeError:
-                raise AttributeError(f"Module '{modname}' does not contain a Task class")
+                raise AttributeError(
+                    f"Module '{modname}' does not contain a Task class"
+                )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     execute_all_tasks()
